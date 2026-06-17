@@ -49792,10 +49792,16 @@ function getGitTags() {
     return tags.trim().split('\n');
 }
 function getGitCommits(from, to) {
-    const logFormat = `--pretty=format:{\\"hash\\":\\"%H\\",\\"author\\":\\"%an\\",\\"date\\":\\"%ad\\",\\"message\\":\\"%s\\"},`;
+    const logFormat = `--pretty=format:%H%x1f%an%x1f%ad%x1f%s%x1e`;
     const rawLog = (0, node_child_process_1.execSync)(`git log ${from}..${to} ${logFormat}`, { encoding: 'utf-8' });
-    const json = `[${rawLog.replace(/,\s*$/, '')}]`;
-    return JSON.parse(json);
+    return rawLog
+        .split('\x1e')
+        .map(record => record.replace(/^\n/, ''))
+        .filter(record => record.length > 0)
+        .map(record => {
+        const [hash, author, date, message] = record.split('\x1f');
+        return { hash, author, date, message };
+    });
 }
 function getOctopusBuildInformationCommits(client, version) {
     const versionTag = `v${version}`;

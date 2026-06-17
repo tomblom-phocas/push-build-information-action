@@ -23,11 +23,21 @@ function getGitTags(): string[] {
 }
 
 function getGitCommits(from: string, to: string): GitCommit[] {
-  const logFormat = `--pretty=format:{\\"hash\\":\\"%H\\",\\"author\\":\\"%an\\",\\"date\\":\\"%ad\\",\\"message\\":\\"%s\\"},`
+  // Use ASCII Unit Separator (US, 0x1f) between fields and Record Separator
+  // (RS, 0x1e) between commits. The previous implementation interpolated %s
+  // directly into a JSON string, which broke JSON.parse whenever a commit
+  // subject contained a literal `"` or `\`.
+  const logFormat = `--pretty=format:%H%x1f%an%x1f%ad%x1f%s%x1e`
   const rawLog = execSync(`git log ${from}..${to} ${logFormat}`, { encoding: 'utf-8' })
 
-  const json = `[${rawLog.replace(/,\s*$/, '')}]`
-  return JSON.parse(json)
+  return rawLog
+    .split('\x1e')
+    .map(record => record.replace(/^\n/, ''))
+    .filter(record => record.length > 0)
+    .map(record => {
+      const [hash, author, date, message] = record.split('\x1f')
+      return { hash, author, date, message }
+    })
 }
 
 function getOctopusBuildInformationCommits(client: Client, version: string): IOctopusBuildInformationCommit[] {
